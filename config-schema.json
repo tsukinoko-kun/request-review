@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Request Review",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "Version of the file format.",
+      "type": "integer"
+    },
+    "discord_webhook": {
+      "description": "URL to interact with Discord API.",
+      "type": "string",
+      "format": "url"
+    }
+  }
+}
