@@ -6,5 +6,5 @@ RUN CGO_ENABLED=0 go build -o rr ./cmd/request-review
 
 FROM alpine:latest
 WORKDIR /request-review
-COPY --from=builder /request-review/rr .
+COPY --from=builder /app/rr .
 ENTRYPOINT [ "/request-review/rr" ]
