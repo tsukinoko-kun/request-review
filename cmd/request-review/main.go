@@ -27,6 +27,8 @@ func main() {
 			initCfg()
 		case "smart":
 			requestReviewSmart()
+		case "edit":
+			editCfg()
 		case "version":
 			fmt.Println(metadata.Version)
 		default:
@@ -59,6 +61,31 @@ func initCfg() {
 		os.Exit(1)
 		return
 	}
+	fmt.Println("Configuration initialized successfully.")
+}
+
+func editCfg() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+		return
+	}
+	if err := cfg.Edit(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return
+		} else {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+			return
+		}
+	}
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+		return
+	}
+	fmt.Println("Configuration updated successfully.")
 }
 
 func requestReviewSmart() {
