@@ -11,6 +11,7 @@ import (
 	"github.com/tsukinoko-kun/request-review/internal/config"
 	"github.com/tsukinoko-kun/request-review/internal/discord"
 	"github.com/tsukinoko-kun/request-review/internal/git"
+	"github.com/tsukinoko-kun/request-review/internal/linear"
 )
 
 func main() {
@@ -107,8 +108,17 @@ func requestReviewForPatch(cfg config.Config, patch string, label string) {
 		os.Exit(1)
 		return
 	}
-	title := fmt.Sprintf("%s in %s @ %s", label, fi.Bookmark(), fi.Name())
-	body := fmt.Sprintf("Request review for %s\n```diff\n%s\n```", label, patch)
+	var (
+		title string
+		body  string
+	)
+	if issue, err := linear.FindIssueByBranchName(cfg, fi.Bookmark()); err == nil {
+		title = fmt.Sprintf("%s in %s @ %s", issue.Title, fi.Bookmark(), fi.Name())
+		body = fmt.Sprintf("Request review for %s\n\n%s\n\n```diff\n%s\n```", issue.Title, issue.Description, patch)
+	} else {
+		title = fmt.Sprintf("%s in %s @ %s", label, fi.Bookmark(), fi.Name())
+		body = fmt.Sprintf("Request review for %s\n```diff\n%s\n```", label, patch)
+	}
 
 	if err := huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Title").Value(&title).Validate(huh.ValidateNotEmpty()),
