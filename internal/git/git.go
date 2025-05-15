@@ -1,13 +1,81 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/tsukinoko-kun/request-review/internal/config"
+	"github.com/tsukinoko-kun/request-review/internal/forge"
 )
+
+type (
+	RepoInfo struct {
+		RemoteURL string
+		Branch    string
+	}
+)
+
+func SmartPatch(cfg config.Config) (string, error) {
+	cmd := exec.Command("git", "fetch", "origin", "main")
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to fetch origin/main: %w", err)
+	}
+
+	cmd = exec.Command("git", "rev-parse", "origin/main")
+	sb := strings.Builder{}
+	cmd.Stdout = &sb
+	cmd.Stderr = &sb
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to get origin/main HEAD: %w", err)
+	}
+	remoteHash := strings.TrimSpace(sb.String())
+
+	cmd = exec.Command("git", "log", "-1", "--format=%H")
+	sb = strings.Builder{}
+	cmd.Stdout = &sb
+	cmd.Stderr = &sb
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to get local current commit: %w", err)
+	}
+	localHash := strings.TrimSpace(sb.String())
+
+	if localHash == remoteHash {
+		return "", errors.New("local and remote are up to date")
+	}
+
+	return Patch(cfg, remoteHash, localHash)
+}
+
+func remoteMainHead(r *git.Repository) (*plumbing.Reference, error) {
+	origin, err := r.Remote("origin")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	refs, err := origin.List(&git.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var headTarget plumbing.ReferenceName
+	for _, ref := range refs {
+		if ref.Name() == plumbing.HEAD {
+			headTarget = ref.Target()
+			break
+		}
+	}
+	if headTarget == "" {
+		return nil, errors.New("remote HEAD not found")
+	}
+
+	return r.Reference(headTarget, true)
+}
 
 func Patch(cfg config.Config, from, to string) (string, error) {
 	wd, err := os.Getwd()
@@ -19,12 +87,20 @@ func Patch(cfg config.Config, from, to string) (string, error) {
 		return "", fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	commit1, err := r.CommitObject(plumbing.NewHash(from))
+	fromHash, err := r.ResolveRevision(plumbing.Revision(from))
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve revision %s: %w", from, err)
+	}
+	commit1, err := r.CommitObject(*fromHash)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit1: %w", err)
 	}
 
-	commit2, err := r.CommitObject(plumbing.NewHash(to))
+	toHash, err := r.ResolveRevision(plumbing.Revision(to))
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve revision %s: %w", to, err)
+	}
+	commit2, err := r.CommitObject(*toHash)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit2: %w", err)
 	}
@@ -35,4 +111,45 @@ func Patch(cfg config.Config, from, to string) (string, error) {
 	}
 
 	return patch.String(), nil
+}
+
+func GetRepoInfo() (forge.ForgeInfo, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return RepoInfo{}, fmt.Errorf("failed to get working directory: %w", err)
+	}
+	r, err := git.PlainOpen(wd)
+	if err != nil {
+		return RepoInfo{}, fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	origin, err := r.Remote("origin")
+	if err != nil {
+		return RepoInfo{}, fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	remoteURL := origin.Config().URLs[0]
+
+	branch, err := r.Head()
+	if err != nil {
+		return RepoInfo{}, fmt.Errorf("failed to get branch: %w", err)
+	}
+
+	branchName := branch.Name().Short()
+
+	return RepoInfo{
+		RemoteURL: remoteURL,
+		Branch:    branchName,
+	}, nil
+}
+
+func (ri RepoInfo) Name() string {
+	pathParts := strings.Split(ri.RemoteURL, "/")
+	name := pathParts[len(pathParts)-1]
+	name = strings.TrimSuffix(name, ".git")
+	return name
+}
+
+func (ri RepoInfo) Bookmark() string {
+	return ri.Branch
 }

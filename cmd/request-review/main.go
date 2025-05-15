@@ -14,17 +14,28 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		exe := filepath.Base(os.Args[0])
-		fmt.Fprintf(os.Stderr, "Usage: %s <from>..<to>\n", exe)
+	switch len(os.Args) {
+	case 1:
+		requestReviewSmart()
+	case 2:
+		switch os.Args[1] {
+		case "help":
+			help()
+		case "init":
+			initCfg()
+		case "smart":
+			requestReviewSmart()
+		default:
+			if strings.Contains(os.Args[1], "..") {
+				splitFromTo := strings.SplitN(os.Args[1], "..", 2)
+				requestReviewRange(splitFromTo[0], splitFromTo[1])
+			}
+			help()
+			os.Exit(1)
+		}
+	default:
+		help()
 		os.Exit(1)
-		return
-	}
-
-	if os.Args[1] == "init" {
-		initCfg()
-	} else {
-		requestReview()
 	}
 }
 
@@ -36,6 +47,11 @@ func initCfg() {
 			Value(&cfg.DiscordWebhook).
 			Validate(discord.ValidateWebhookURL).
 			Placeholder("https://discord.com/api/webhooks/..."),
+		huh.NewInput().
+			Title("Linear Personal API Key").
+			Description("Go to Settings > Security & Access > Personal API keys > New API key\nSelect Read permission").
+			Value(&cfg.LinearPersonalApiKey).
+			Placeholder("lin_api_..."),
 	)).Run(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
 			return
@@ -52,19 +68,71 @@ func initCfg() {
 	}
 }
 
-func requestReview() {
+func requestReviewSmart() {
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 		return
 	}
-	splitFromTo := strings.SplitN(os.Args[1], "..", 2)
-	if patch, err := git.Patch(cfg, splitFromTo[0], splitFromTo[1]); err != nil {
+	if patch, err := git.SmartPatch(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 		return
 	} else {
-		fmt.Println(patch)
+		requestReviewForPatch(cfg, patch, "Smart review")
 	}
+}
+
+func requestReviewRange(from, to string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+		return
+	}
+	if patch, err := git.Patch(cfg, from, to); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+		return
+	} else {
+		requestReviewForPatch(cfg, patch, os.Args[1])
+	}
+}
+
+func requestReviewForPatch(cfg config.Config, patch string, label string) {
+	fi, err := git.GetRepoInfo()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+		return
+	}
+	title := fmt.Sprintf("%s in %s @ %s", label, fi.Bookmark(), fi.Name())
+	body := fmt.Sprintf("Request review for %s\n```diff\n%s\n```", label, patch)
+
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().Title("Title").Value(&title).Validate(huh.ValidateNotEmpty()),
+		huh.NewText().Title("Body").Value(&body).Validate(huh.ValidateNotEmpty()),
+	)).Run(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+		return
+	}
+
+	if err := discord.StartThread(cfg, title, body); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+		return
+	}
+}
+
+func help() {
+	exe := filepath.Base(os.Args[0])
+	fmt.Printf("%s <from>..<to> - Request review for a range of commits", exe)
+	fmt.Printf("%s smart        - Request review with smart range", exe)
+	fmt.Printf("%s init         - Initialize a configuration", exe)
+	fmt.Printf("%s help         - Show this help message", exe)
 }
