@@ -12,6 +12,7 @@ import (
 	"github.com/tsukinoko-kun/request-review/internal/discord"
 	"github.com/tsukinoko-kun/request-review/internal/git"
 	"github.com/tsukinoko-kun/request-review/internal/linear"
+	"github.com/tsukinoko-kun/request-review/internal/metadata"
 )
 
 func main() {
@@ -26,6 +27,8 @@ func main() {
 			initCfg()
 		case "smart":
 			requestReviewSmart()
+		case "version":
+			fmt.Println(metadata.Version)
 		default:
 			if strings.Contains(os.Args[1], "..") {
 				splitFromTo := strings.SplitN(os.Args[1], "..", 2)
