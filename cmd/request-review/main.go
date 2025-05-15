@@ -81,7 +81,7 @@ func requestReviewSmart() {
 		os.Exit(1)
 		return
 	} else {
-		requestReviewForPatch(cfg, patch, "Smart review")
+		requestReviewForPatch(cfg, patch, "")
 	}
 }
 
@@ -115,6 +115,9 @@ func requestReviewForPatch(cfg config.Config, patch string, label string) {
 	if issue, err := linear.FindIssueByBranchName(cfg, fi.Bookmark()); err == nil {
 		title = fmt.Sprintf("%s in %s @ %s", issue.Title, fi.Bookmark(), fi.Name())
 		body = fmt.Sprintf("Request review for %s\n\n%s\n\n```diff\n%s\n```", issue.Title, issue.Description, patch)
+	} else if label == "" {
+		title = fmt.Sprintf("%s @ %s", fi.Bookmark(), fi.Name())
+		body = fmt.Sprintf("Request review for %s\n```diff\n%s\n```", fi.Bookmark(), patch)
 	} else {
 		title = fmt.Sprintf("%s in %s @ %s", label, fi.Bookmark(), fi.Name())
 		body = fmt.Sprintf("Request review for %s\n```diff\n%s\n```", label, patch)
