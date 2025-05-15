@@ -27,54 +27,25 @@ func SmartPatch(cfg config.Config) (string, error) {
 	}
 
 	cmd = exec.Command("git", "rev-parse", "origin/main")
-	sb := strings.Builder{}
-	cmd.Stdout = &sb
-	cmd.Stderr = &sb
-	cmd.Stdin = os.Stdin
-	if err := cmd.Run(); err != nil {
+	remoteHashB, err := cmd.Output()
+	if err != nil {
 		return "", fmt.Errorf("failed to get origin/main HEAD: %w", err)
 	}
-	remoteHash := strings.TrimSpace(sb.String())
+	remoteHash := strings.TrimSpace(string(remoteHashB))
 
 	cmd = exec.Command("git", "log", "-1", "--format=%H")
-	sb = strings.Builder{}
-	cmd.Stdout = &sb
-	cmd.Stderr = &sb
 	cmd.Stdin = os.Stdin
-	if err := cmd.Run(); err != nil {
+	localHashB, err := cmd.Output()
+	if err != nil {
 		return "", fmt.Errorf("failed to get local current commit: %w", err)
 	}
-	localHash := strings.TrimSpace(sb.String())
+	localHash := strings.TrimSpace(string(localHashB))
 
 	if localHash == remoteHash {
 		return "", errors.New("local and remote are up to date")
 	}
 
 	return Patch(cfg, remoteHash, localHash)
-}
-
-func remoteMainHead(r *git.Repository) (*plumbing.Reference, error) {
-	origin, err := r.Remote("origin")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get remote: %w", err)
-	}
-
-	refs, err := origin.List(&git.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	var headTarget plumbing.ReferenceName
-	for _, ref := range refs {
-		if ref.Name() == plumbing.HEAD {
-			headTarget = ref.Target()
-			break
-		}
-	}
-	if headTarget == "" {
-		return nil, errors.New("remote HEAD not found")
-	}
-
-	return r.Reference(headTarget, true)
 }
 
 func Patch(cfg config.Config, from, to string) (string, error) {
@@ -152,4 +123,13 @@ func (ri RepoInfo) Name() string {
 
 func (ri RepoInfo) Bookmark() string {
 	return ri.Branch
+}
+
+func User() string {
+	cmd := exec.Command("git", "config", "--global", "user.name")
+	output, err := cmd.Output()
+	if err != nil {
+		return "Unknown User"
+	}
+	return strings.TrimSpace(string(output))
 }
