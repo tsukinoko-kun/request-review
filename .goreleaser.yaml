@@ -1,7 +1,22 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 ---
 builds:
-  - main: "./cmd/request-review/main.go"
+  - id: windows-only
+    main: "./cmd/request-review/main.go"
+    binary: request-review
+    ldflags:
+      - -s
+      - -w
+      - -X github.com/tsukinoko-kun/request-review/internal/metadata.Version={{.Version}}
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+  - id: default
+    main: "./cmd/request-review/main.go"
     binary: request-review
     ldflags:
       - -s
@@ -10,12 +25,19 @@ builds:
     goos:
       - darwin
       - linux
-      - windows
     goarch:
       - amd64
       - arm64
     env:
       - CGO_ENABLED=0
+
+archives:
+  - id: windows-only
+    builds: [windows-only]
+    format: zip
+  - id: default
+    builds: [default]
+    format: tar.gz
 
 checksum:
   name_template: "checksums.txt"
@@ -32,9 +54,28 @@ brews:
   - name: request-review
     homepage: https://github.com/tsukinoko-kun/request-review
     description: Forgeless merge requests
+    license: MIT
+    dependencies:
+      - git
     repository:
       owner: tsukinoko-kun
       name: homebrew-tap
     commit_author:
       name: tsukinoko-kun
       email: gh@frankmayer.dev
+
+scoops:
+  - name: request-review
+    url_template: https://github.com/tsukinoko-kun/request-review/releases/download/{{ .Tag }}/{{ .ArtifactName }}
+    commit_author:
+      name: tsukinoko-kun
+      email: gh@frankmayer.dev
+    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: https://github.com/tsukinoko-kun/request-review
+    description: Forgeless merge requests
+    license: MIT
+    depends:
+      - git
+    repository:
+      owner: tsukinoko-kun
+      name: scoop-bucket
