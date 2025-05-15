@@ -2,7 +2,7 @@ FROM golang:1-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN go mod download
-RUN CGO_ENABLED=0 go build -o rr ./cmd/rr
+RUN CGO_ENABLED=0 go build -o rr ./cmd/request-review
 
 FROM alpine:latest
 WORKDIR /request-review

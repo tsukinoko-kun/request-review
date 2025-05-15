@@ -34,7 +34,7 @@ brews:
     description: Forgeless merge requests
     repository:
       owner: tsukinoko-kun
-      name: request-review
+      name: homebrew-tap
     commit_author:
       name: tsukinoko-kun
       email: gh@frankmayer.dev
