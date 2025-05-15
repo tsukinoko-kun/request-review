@@ -4,14 +4,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/huh"
 	"github.com/goccy/go-yaml"
 	"github.com/tsukinoko-kun/request-review/internal/crypt"
+	"github.com/tsukinoko-kun/request-review/internal/discord"
+	"github.com/tsukinoko-kun/request-review/internal/git"
 )
 
 var Version = 1
 
 type Config struct {
 	Version              int    `yaml:"version"`
+	name                 string `yaml:"-"`
 	DiscordWebhook       string `yaml:"discord_webhook,omitempty"`
 	LinearPersonalApiKey string `yaml:"linear_personal_api_key,omitempty"`
 }
@@ -19,7 +23,26 @@ type Config struct {
 func New() Config {
 	return Config{
 		Version: Version,
+		name:    git.RepoUrl(),
 	}
+}
+
+func (cfg *Config) Edit() error {
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Discord Webhook URL").
+			Value(&cfg.DiscordWebhook).
+			Validate(discord.ValidateWebhookURL).
+			Placeholder("https://discord.com/api/webhooks/..."),
+		huh.NewInput().
+			Title("Linear Personal API Key").
+			Description("Go to Settings > Security & Access > Personal API keys > New API key\nSelect Read permission").
+			Value(&cfg.LinearPersonalApiKey).
+			Placeholder("lin_api_..."),
+	)).Run(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func Load() (Config, error) {
@@ -29,7 +52,9 @@ func Load() (Config, error) {
 	}
 	defer f.Close()
 
-	var cfg Config
+	cfg := Config{
+		name: git.RepoUrl(),
+	}
 	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
 		return Config{}, err
 	}
@@ -38,11 +63,11 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("config version %d is not supported, update to use", cfg.Version)
 	}
 
-	cfg.DiscordWebhook, err = crypt.Decrypt(cfg.DiscordWebhook)
+	cfg.DiscordWebhook, err = crypt.Decrypt(cfg.name, cfg.DiscordWebhook)
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to decrypt Discord webhook URL: %w", err)
 	}
-	cfg.LinearPersonalApiKey, err = crypt.Decrypt(cfg.LinearPersonalApiKey)
+	cfg.LinearPersonalApiKey, err = crypt.Decrypt(cfg.name, cfg.LinearPersonalApiKey)
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to decrypt Linear personal API key: %w", err)
 	}
@@ -52,11 +77,11 @@ func Load() (Config, error) {
 
 func (cfg Config) Save() error {
 	var err error
-	cfg.DiscordWebhook, err = crypt.Encrypt(cfg.DiscordWebhook)
+	cfg.DiscordWebhook, err = crypt.Encrypt(cfg.name, cfg.DiscordWebhook)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt Discord webhook URL: %w", err)
 	}
-	cfg.LinearPersonalApiKey, err = crypt.Encrypt(cfg.LinearPersonalApiKey)
+	cfg.LinearPersonalApiKey, err = crypt.Encrypt(cfg.name, cfg.LinearPersonalApiKey)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt Linear personal API key: %w", err)
 	}

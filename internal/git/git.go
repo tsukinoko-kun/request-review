@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/tsukinoko-kun/request-review/internal/config"
 	"github.com/tsukinoko-kun/request-review/internal/forge"
 )
 
@@ -20,7 +19,7 @@ type (
 	}
 )
 
-func SmartPatch(cfg config.Config) (string, error) {
+func SmartPatch() (string, error) {
 	cmd := exec.Command("git", "fetch", "origin", "main")
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to fetch origin/main: %w", err)
@@ -45,10 +44,10 @@ func SmartPatch(cfg config.Config) (string, error) {
 		return "", errors.New("local and remote are up to date")
 	}
 
-	return Patch(cfg, remoteHash, localHash)
+	return Patch(remoteHash, localHash)
 }
 
-func Patch(cfg config.Config, from, to string) (string, error) {
+func Patch(from, to string) (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get working directory: %w", err)
@@ -82,6 +81,15 @@ func Patch(cfg config.Config, from, to string) (string, error) {
 	}
 
 	return patch.String(), nil
+}
+
+func RepoUrl() string {
+	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
 }
 
 func GetRepoInfo() (forge.ForgeInfo, error) {

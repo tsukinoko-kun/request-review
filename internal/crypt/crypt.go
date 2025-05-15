@@ -10,13 +10,14 @@ import (
 	"io"
 	"os"
 
+	"github.com/charmbracelet/huh"
 	"github.com/zalando/go-keyring"
 )
 
 const service = "dev.frankmayer.request-review"
 
-func Encrypt(plaintext string) (string, error) {
-	key, err := getKey()
+func Encrypt(name string, plaintext string) (string, error) {
+	key, err := getKey(name, true)
 	if err != nil {
 		return "", errors.Join(errors.New("Error getting AES key"), err)
 	}
@@ -27,8 +28,8 @@ func Encrypt(plaintext string) (string, error) {
 	return enc, nil
 }
 
-func Decrypt(ciphertext string) (string, error) {
-	key, err := getKey()
+func Decrypt(name string, ciphertext string) (string, error) {
+	key, err := getKey(name, false)
 	if err != nil {
 		return "", errors.Join(errors.New("Error getting AES key"), err)
 	}
@@ -39,18 +40,29 @@ func Decrypt(ciphertext string) (string, error) {
 	return dec, nil
 }
 
-func getKey() (string, error) {
-	if k, err := keyring.Get(service, "crypt-key"); err == nil {
+func getKey(name string, allowCreateKey bool) (string, error) {
+	if k, err := keyring.Get(service, name); err == nil {
 		return k, nil
 	}
 
-	k, err := genRandomKey(32)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error generating AES key: %v\n", err)
-		panic(err)
+	var k string
+	var err error
+
+	if allowCreateKey {
+		k, err = genRandomKey(32)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating AES key: %v\n", err)
+			panic(err)
+		}
+	} else {
+		if err := huh.NewForm(huh.NewGroup(
+			huh.NewInput().Title("Encryption Password").Value(&k).EchoMode(huh.EchoModePassword),
+		)).Run(); err != nil {
+			return "", err
+		}
 	}
 
-	err = keyring.Set(service, "crypt-key", k)
+	err = keyring.Set(service, name, k)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error setting AES key: %v\n", err)
 		panic(err)

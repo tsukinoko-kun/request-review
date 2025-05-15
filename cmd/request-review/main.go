@@ -45,18 +45,7 @@ func main() {
 
 func initCfg() {
 	cfg := config.New()
-	if err := huh.NewForm(huh.NewGroup(
-		huh.NewInput().
-			Title("Discord Webhook URL").
-			Value(&cfg.DiscordWebhook).
-			Validate(discord.ValidateWebhookURL).
-			Placeholder("https://discord.com/api/webhooks/..."),
-		huh.NewInput().
-			Title("Linear Personal API Key").
-			Description("Go to Settings > Security & Access > Personal API keys > New API key\nSelect Read permission").
-			Value(&cfg.LinearPersonalApiKey).
-			Placeholder("lin_api_..."),
-	)).Run(); err != nil {
+	if err := cfg.Edit(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
 			return
 		} else {
@@ -79,7 +68,7 @@ func requestReviewSmart() {
 		os.Exit(1)
 		return
 	}
-	if patch, err := git.SmartPatch(cfg); err != nil {
+	if patch, err := git.SmartPatch(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 		return
@@ -95,7 +84,7 @@ func requestReviewRange(from, to string) {
 		os.Exit(1)
 		return
 	}
-	if patch, err := git.Patch(cfg, from, to); err != nil {
+	if patch, err := git.Patch(from, to); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 		return
@@ -139,7 +128,7 @@ func requestReviewForPatch(cfg config.Config, patch string, label string) {
 		return
 	}
 
-	if err := discord.StartThread(cfg, title, body); err != nil {
+	if err := discord.StartThread(cfg.DiscordWebhook, title, body); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 		return

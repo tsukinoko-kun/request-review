@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/tsukinoko-kun/request-review/internal/config"
 )
 
 var (
@@ -25,8 +24,8 @@ func ValidateWebhookURL(url string) error {
 	return nil
 }
 
-func StartThread(cfg config.Config, title string, content string) error {
-	if cfg.DiscordWebhook == "" {
+func StartThread(webhook string, title string, content string) error {
+	if webhook == "" {
 		return ErrWebhookNotSet
 	}
 	wp := discordgo.WebhookParams{
@@ -36,7 +35,7 @@ func StartThread(cfg config.Config, title string, content string) error {
 	sb := strings.Builder{}
 	je := json.NewEncoder(&sb)
 	je.Encode(wp)
-	resp, err := http.Post(cfg.DiscordWebhook, "application/json", strings.NewReader(sb.String()))
+	resp, err := http.Post(webhook, "application/json", strings.NewReader(sb.String()))
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
