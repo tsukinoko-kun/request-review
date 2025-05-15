@@ -22,6 +22,9 @@ type (
 		ID          string `json:"id"`
 		Title       string `json:"title"`
 		Description string `json:"description"`
+		Project     struct {
+			Name string `json:"name"`
+		} `json:"project"`
 	}
 )
 
@@ -37,18 +40,21 @@ func FindIssueByBranchName(cfg config.Config, branchName string) (Issue, error) 
 	}
 
 	query := fmt.Sprintf(`
- query {
-  issues(filter: {
-  branchName: { eq: "%s" }
-  }) {
-  nodes {
-  id
-  title
-  description
-  }
-  }
- }
- `, branchName)
+query {
+  	issues(filter: {
+  		branchName: { eq: "%s" }
+    }) {
+   		nodes {
+   			id
+      		title
+      		description
+        	project {
+                name
+            }
+        }
+    }
+}
+`, branchName)
 
 	jsonValue, _ := json.Marshal(map[string]string{
 		"query": query,

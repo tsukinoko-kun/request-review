@@ -133,7 +133,7 @@ func requestReviewForPatch(cfg config.Config, patch string, label string) {
 	)
 	author := git.User()
 	if issue, err := linear.FindIssueByBranchName(cfg, fi.Bookmark()); err == nil {
-		title = fmt.Sprintf("%s in %s @ %s", issue.Title, fi.Bookmark(), fi.Name())
+		title = fmt.Sprintf("%s in %s @ %s", issue.Title, fi.Bookmark(), issue.Project.Name)
 		body = fmt.Sprintf("%s requested review for %s\n\n%s\n\n```diff\n%s\n```", author, issue.Title, issue.Description, patch)
 	} else if label == "" {
 		title = fmt.Sprintf("%s @ %s", fi.Bookmark(), fi.Name())
